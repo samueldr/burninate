@@ -1,0 +1,138 @@
+#!/usr/bin/env nix-shell
+
+require "optparse"
+require "open3"
+require "shellwords"
+
+# This was found, across a range of devices, to be the least bad default value.
+#
+# The main advantage of defaulting to 8M is that with my tests it's the value
+# that was the closest to its actual speed. Furthermore, faster drives didn't
+# end up writing much faster with bigger block sizes, while smaller block sizes
+# hampered performances.
+#
+# Until this can be detected and updated on the fly, this is the least worst
+# option to use.
+DEFAULT_BLOCK_SIZE = "8M"
+
+module Utils
+  def file_type(path)
+    file_type, status = Open3.capture2("file", "-bL", "--mime-type", path)
+
+    unless status.success?
+      $stderr.puts "error: Could not check the file type of the given path."
+      exit status.exitstatus
+    end
+
+    file_type.strip
+  end
+  module_function :file_type
+end
+
+# These functions give an array for a command that will be inserted at the top
+# of the pipeline.
+module ExpansionMethods
+  extend self
+
+  KNOWN_METHODS = {
+    "application/x-bzip2" => :from_bz2,
+  }
+
+  def from_compressed?(mime_type)
+    !!(KNOWN_METHODS[mime_type])
+  end
+
+  def expand!(path)
+    mime = Utils.file_type(path)
+    if from_compressed?(mime)
+      send(KNOWN_METHODS[mime], path)
+    else
+      raise "Cannot expand from #{mime}."
+    end
+  end
+
+  def from_bz2(path)
+    ["bzcat", path]
+  end
+end
+
+# Parse options.
+params = {}
+options_parser = OptionParser.new do |opts|
+  opts.banner = "Usage: burninate [options]"
+
+  opts.on("--from FILE")
+  opts.on("--to DEVICE")
+  opts.on("--block-size SIZE", "Defaults to #{DEFAULT_BLOCK_SIZE}")
+end
+options_parser.parse!(into: params)
+
+unless params[:to] and params[:from]
+  $stderr.puts("error: Option --to is missing.") unless params[:to]
+  $stderr.puts("error: Option --from is missing.") unless params[:from]
+  $stdout.puts(options_parser.help)
+  exit 1
+end
+
+# Check things are all right.
+
+from = params[:from]
+to = params[:to]
+
+unless File.exists?(from)
+  $stderr.puts "Source path '#{from}' does not exist."
+  exit 1
+end
+
+unless File.exists?(to)
+  $stderr.puts "Destination path '#{to}' does not exist."
+  $stderr.puts "Verify the device has been inserted, and you are using the right name."
+  exit 1
+end
+unless File.blockdev?(to)
+  $stderr.puts "Destinatino path '#{to}' must be a block device."
+  $stderr.puts "Burnination can only be done on block devices."
+  exit 1
+end
+
+# Prepare configurable `dd` args.
+dd_args = [
+  "bs=#{params[:'block-size'] or DEFAULT_BLOCK_SIZE}"
+]
+
+# Prepare appendablt `pv` args.
+pv_args = [
+  "-ptebar"
+]
+
+$stdout.puts("Writing: #{from}")
+$stdout.puts("     to: #{to}...")
+
+pipeline = []
+
+if ExpansionMethods.from_compressed?(Utils.file_type(from))
+  # If we ever get a compressed format that knows about its output size, we'll
+  # have to tweak this bit to add it to `pv_args`.
+  $stdout.puts("warning: Cannot get the output file size from compressed file...")
+  pipeline << ExpansionMethods.expand!(from)
+else
+  pv_args << from
+end
+
+pipeline << ["pv", *pv_args]
+# Some would argue that using `dd` here is useless.
+# This is done to use `direct` and `sync` options.
+# The main drawback is that we could be losing speed.
+pipeline << ["dd", "iflag=fullblock", "oflag=direct,sync", "of=#{to}", *dd_args]
+Open3.pipeline(*pipeline)
+
+# Just in case `dd` couldn't sync
+$stdout.puts("... syncing #{to}")
+system("sync", to)
+
+#!nix-shell --pure
+#!nix-shell -p file
+#!nix-shell -p pv
+#!nix-shell -p coreutils
+#!nix-shell -p ruby -i ruby
+# vim: ft=ruby
