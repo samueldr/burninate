@@ -36,6 +36,7 @@ module ExpansionMethods
 
   KNOWN_METHODS = {
     "application/x-bzip2" => :from_bz2,
+    "application/gzip" => :from_gzip,
   }
 
   def from_compressed?(mime_type)
@@ -53,6 +54,10 @@ module ExpansionMethods
 
   def from_bz2(path)
     ["bzcat", path]
+  end
+
+  def from_gzip(path)
+    ["zcat", path]
   end
 end
 
