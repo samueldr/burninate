@@ -9,6 +9,7 @@ let
     coreutils
     file
     pv
+    zstd
   ]);
 in
 

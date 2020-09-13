@@ -37,6 +37,7 @@ module ExpansionMethods
   KNOWN_METHODS = {
     "application/x-bzip2" => :from_bz2,
     "application/gzip" => :from_gzip,
+    "application/zstd" => :from_zstd,
   }
 
   def from_compressed?(mime_type)
@@ -58,6 +59,10 @@ module ExpansionMethods
 
   def from_gzip(path)
     ["zcat", path]
+  end
+
+  def from_zstd(path)
+    ["zstdcat", path]
   end
 end
 
@@ -139,5 +144,6 @@ system("sync", to)
 #!nix-shell -p file
 #!nix-shell -p pv
 #!nix-shell -p coreutils
+#!nix-shell -p zstd
 #!nix-shell -p ruby -i ruby
 # vim: ft=ruby
