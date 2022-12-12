@@ -4,6 +4,14 @@ require "optparse"
 require "open3"
 require "shellwords"
 
+EXE_FILE = "file"
+EXE_BZCAT = "bzcat"
+EXE_ZCAT = "zcat"
+EXE_XZCAT = "xzcat"
+EXE_ZSTDCAT = "zstdcat"
+EXE_PV = "pv"
+EXE_DD = "dd"
+
 # This was found, across a range of devices, to be the least bad default value.
 #
 # The main advantage of defaulting to 8M is that with my tests it's the value
@@ -17,7 +25,7 @@ DEFAULT_BLOCK_SIZE = "8M"
 
 module Utils
   def file_type(path)
-    file_type, status = Open3.capture2("file", "-bL", "--mime-type", path)
+    file_type, status = Open3.capture2(EXE_FILE, "-bL", "--mime-type", path)
 
     unless status.success?
       $stderr.puts "error: Could not check the file type of the given path."
@@ -55,19 +63,19 @@ module ExpansionMethods
   end
 
   def from_bz2(path)
-    ["bzcat", path]
+    [EXE_BZCAT, path]
   end
 
   def from_gzip(path)
-    ["zcat", path]
+    [EXE_ZCAT, path]
   end
 
   def from_xz(path)
-    ["xzcat", path]
+    [EXE_XZCAT, path]
   end
 
   def from_zstd(path)
-    ["zstdcat", path]
+    [EXE_ZSTDCAT, path]
   end
 end
 
@@ -134,11 +142,11 @@ else
   pv_args << from
 end
 
-pipeline << ["pv", *pv_args]
+pipeline << [EXE_PV, *pv_args]
 # Some would argue that using `dd` here is useless.
 # This is done to use `direct` and `sync` options.
 # The main drawback is that we could be losing speed.
-pipeline << ["dd", "iflag=fullblock", "oflag=direct,sync", "of=#{to}", *dd_args]
+pipeline << [EXE_DD, "iflag=fullblock", "oflag=direct,sync", "of=#{to}", *dd_args]
 Open3.pipeline(*pipeline)
 
 # Just in case `dd` couldn't sync
