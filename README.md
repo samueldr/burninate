@@ -13,6 +13,17 @@ By design, this will not write to a normal file, but only to block devices.
 By design, it uses `dd` under `pv`, as I haven't found a way to make `pv` use
 the equivalent of `oflag=direct,sync`.
 
+
+I want to try it, quickly!
+--------------------------
+
+Using your current `<nixpkgs>` semantics, this will start a shell with
+`burninate` available from the latest commit of the `development` branch:
+
+```
+nix-shell -p 'import (builtins.fetchTarball "https://github.com/samueldr/burninate/archive/refs/heads/development.tar.gz") { inherit pkgs; }'
+```
+
 * * *
 
 ```
