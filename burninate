@@ -102,12 +102,12 @@ end
 from = params[:from]
 to = params[:to]
 
-unless File.exists?(from)
+unless File.exist?(from)
   $stderr.puts "Source path '#{from}' does not exist."
   exit 1
 end
 
-unless File.exists?(to)
+unless File.exist?(to)
   $stderr.puts "Destination path '#{to}' does not exist."
   $stderr.puts "Verify the device has been inserted, and you are using the right name."
   exit 1
